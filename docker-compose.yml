@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: khujigo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: khujigo
+      POSTGRES_PASSWORD: khujigo
+      POSTGRES_DB: khujigo
+    ports:
+      - '5433:5432'
+    volumes:
+      - khujigo_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U khujigo -d khujigo']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  khujigo_pgdata:

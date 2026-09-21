@@ -1,0 +1,345 @@
+### KhujiGo API — manual smoke tests
+### Works with the VS Code "REST Client" extension, or copy the curl equivalents.
+### Run `npm run db:setup` first so the demo data exists.
+
+@baseUrl = http://localhost:4000/api/v1
+@customerToken = PASTE_CUSTOMER_ACCESS_TOKEN
+@adminToken = PASTE_ADMIN_ACCESS_TOKEN
+@adminPassword = PASTE_SUPER_ADMIN_PASSWORD
+
+### Liveness + database check
+GET {{baseUrl}}/health
+
+### ---------------------------------------------------------------------------
+### Catalog (public)
+### ---------------------------------------------------------------------------
+
+### Page 1 of the catalog
+GET {{baseUrl}}/products?page=1&limit=4
+
+### Search + sort by price ascending
+GET {{baseUrl}}/products?search=watch&sort=price_asc
+
+### Filter by category, only discounted, in stock
+GET {{baseUrl}}/products?categorySlug=gadgets&onSale=true&inStock=true
+
+### Price range
+GET {{baseUrl}}/products?minPrice=900&maxPrice=1500&sort=price_desc
+
+### Product detail by slug
+GET {{baseUrl}}/products/t900-ultra-2-smartwatch-bangla-support
+
+### Related products
+GET {{baseUrl}}/products/prod-1/related?limit=3
+
+### Unknown query parameter -> 400
+GET {{baseUrl}}/products?bogus=1
+
+### Categories with product counts
+GET {{baseUrl}}/categories
+
+### Hero banners
+GET {{baseUrl}}/banners
+
+### Delivery pricing
+GET {{baseUrl}}/delivery-settings
+
+### ---------------------------------------------------------------------------
+### Auth
+### ---------------------------------------------------------------------------
+
+### Customer login (demo account) -> copy accessToken into @customerToken
+POST {{baseUrl}}/auth/customer/login
+Content-Type: application/json
+
+{ "identifier": "customer@khujigo.com", "password": "customer123" }
+
+### Customer login by phone number
+POST {{baseUrl}}/auth/customer/login
+Content-Type: application/json
+
+{ "identifier": "01712345678", "password": "customer123" }
+
+### Register a new customer
+POST {{baseUrl}}/auth/customer/register
+Content-Type: application/json
+
+{
+  "name": "Test Buyer",
+  "email": "test.buyer@example.com",
+  "phone": "01755554444",
+  "password": "test1234",
+  "division": "dhaka",
+  "district": "dhaka-city",
+  "area": "Uttara",
+  "address": "House 9, Road 3, Uttara, Dhaka"
+}
+
+### Profile (requires a customer token)
+GET {{baseUrl}}/auth/customer/me
+Authorization: Bearer {{customerToken}}
+
+### Update profile
+PATCH {{baseUrl}}/auth/customer/me
+Authorization: Bearer {{customerToken}}
+Content-Type: application/json
+
+{ "area": "Gulshan", "address": "Road 11, Gulshan 1, Dhaka" }
+
+### Admin login -> copy accessToken into @adminToken
+POST {{baseUrl}}/auth/admin/login
+Content-Type: application/json
+
+{ "email": "admin@khujigo.com", "password": "{{adminPassword}}" }
+
+### Admin profile
+GET {{baseUrl}}/auth/admin/me
+Authorization: Bearer {{adminToken}}
+
+### Wrong audience: customer token on an admin route -> 403
+GET {{baseUrl}}/analytics
+Authorization: Bearer {{customerToken}}
+
+### Missing token -> 401
+GET {{baseUrl}}/analytics
+
+### ---------------------------------------------------------------------------
+### Coupons
+### ---------------------------------------------------------------------------
+
+### Fixed discount
+POST {{baseUrl}}/coupons/validate
+Content-Type: application/json
+
+{ "code": "KHUJIGO100", "subtotal": 2300 }
+
+### Percentage discount, capped at maxDiscountAmount (10% of 9000 = 900 -> 300)
+POST {{baseUrl}}/coupons/validate
+Content-Type: application/json
+
+{ "code": "EID2026", "subtotal": 9000 }
+
+### Below the minimum order amount -> valid: false
+POST {{baseUrl}}/coupons/validate
+Content-Type: application/json
+
+{ "code": "KHUJIGO100", "subtotal": 500 }
+
+### Unknown coupon -> valid: false
+POST {{baseUrl}}/coupons/validate
+Content-Type: application/json
+
+{ "code": "NOPE", "subtotal": 5000 }
+
+### All coupons (admin)
+GET {{baseUrl}}/coupons
+Authorization: Bearer {{adminToken}}
+
+### ---------------------------------------------------------------------------
+### Checkout
+### ---------------------------------------------------------------------------
+
+### Place an order (compute totals server-side)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "Zubair Hossain",
+  "customerPhone": "01712345678",
+  "customerEmail": "customer@khujigo.com",
+  "division": "dhaka",
+  "district": "dhaka-city",
+  "area": "Dhanmondi",
+  "fullAddress": "House #45, Road #7/A, Dhanmondi R/A, Dhaka",
+  "deliveryNotes": "Please call before delivery",
+  "paymentMethod": "COD",
+  "couponCode": "KHUJIGO100",
+  "items": [
+    { "productId": "prod-1", "quantity": 1 },
+    { "productId": "prod-7", "quantity": 1 }
+  ]
+}
+
+### Free delivery at or above the threshold (2 x 1450 = 2900 -> charge 0)
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "Zubair Hossain",
+  "customerPhone": "01712345678",
+  "division": "dhaka",
+  "district": "dhaka-city",
+  "area": "Dhanmondi",
+  "fullAddress": "House #45, Road #7/A, Dhanmondi R/A, Dhaka",
+  "paymentMethod": "COD",
+  "items": [{ "productId": "prod-1", "quantity": 2 }]
+}
+
+### Outside Dhaka -> higher delivery charge
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "Nusrat Farhana",
+  "customerPhone": "01819876543",
+  "division": "chattogram",
+  "district": "chattogram",
+  "area": "Nasirabad",
+  "fullAddress": "Flat 4B, Green View Tower, GEC Circle, Chattogram",
+  "paymentMethod": "BKASH",
+  "items": [{ "productId": "prod-3", "quantity": 1 }]
+}
+
+### Insufficient stock -> 409
+POST {{baseUrl}}/orders
+Content-Type: application/json
+
+{
+  "customerName": "Zubair Hossain",
+  "customerPhone": "01712345678",
+  "division": "dhaka",
+  "district": "dhaka-city",
+  "area": "Dhanmondi",
+  "fullAddress": "House #45, Road #7/A, Dhanmondi R/A, Dhaka",
+  "paymentMethod": "COD",
+  "items": [{ "productId": "prod-4", "quantity": 999999 }]
+}
+
+### Receipt (order id from a previous response)
+GET {{baseUrl}}/orders/KG-2026-8941
+
+### My orders (requires a customer token)
+GET {{baseUrl}}/orders/mine?limit=20
+Authorization: Bearer {{customerToken}}
+
+### Admin order list with filters
+GET {{baseUrl}}/orders?status=PENDING&paymentStatus=UNPAID&limit=10
+Authorization: Bearer {{adminToken}}
+
+### Admin order search
+GET {{baseUrl}}/orders?search=0171
+Authorization: Bearer {{adminToken}}
+
+### Advance order status (staff is allowed)
+PATCH {{baseUrl}}/orders/KG-2026-8941/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "SHIPPED" }
+
+### Mark an order paid
+PATCH {{baseUrl}}/orders/KG-2026-8941/payment-status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "paymentStatus": "PAID" }
+
+### ---------------------------------------------------------------------------
+### Reviews
+### ---------------------------------------------------------------------------
+
+### Approved reviews for a product (public)
+GET {{baseUrl}}/reviews?productId=prod-1
+
+### Latest approved reviews across the storefront
+GET {{baseUrl}}/reviews?limit=4
+
+### Submit a review (enters the moderation queue as PENDING)
+POST {{baseUrl}}/reviews
+Content-Type: application/json
+
+{
+  "productId": "prod-1",
+  "customerName": "Test Reviewer",
+  "rating": 5,
+  "comment": "Great watch, Bangla notifications work perfectly."
+}
+
+### Moderation queue (admin)
+GET {{baseUrl}}/reviews/admin/all?status=PENDING
+Authorization: Bearer {{adminToken}}
+
+### Approve a review
+PATCH {{baseUrl}}/reviews/REPLACE_WITH_REVIEW_ID/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "status": "APPROVED" }
+
+### ---------------------------------------------------------------------------
+### Admin catalog writes
+### ---------------------------------------------------------------------------
+
+### Product listing including DRAFT/ARCHIVED
+GET {{baseUrl}}/products/admin/all?status=DRAFT
+Authorization: Bearer {{adminToken}}
+
+### Create a product
+POST {{baseUrl}}/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "nameEn": "Manual Test Product",
+  "nameBn": "ম্যানুয়াল টেস্ট পণ্য",
+  "slug": "manual-test-product",
+  "sku": "KG-MAN-999",
+  "categoryId": "cat-accessories",
+  "brand": "TestBrand",
+  "shortDescEn": "Short description",
+  "shortDescBn": "সংক্ষিপ্ত বিবরণ",
+  "descriptionEn": "Full description",
+  "descriptionBn": "সম্পূর্ণ বিবরণ",
+  "price": 999,
+  "comparePrice": 1499,
+  "discountPercent": 33,
+  "stockQuantity": 10,
+  "lowStockThreshold": 3,
+  "thumbnailUrl": "https://picsum.photos/seed/manualtest/600/600",
+  "galleryUrls": ["https://picsum.photos/seed/manualtest/800/800"],
+  "status": "ACTIVE",
+  "isNewArrival": true,
+  "tags": ["manual", "test"],
+  "specifications": [
+    { "keyEn": "Colour", "keyBn": "রং", "valueEn": "Black", "valueBn": "কালো" }
+  ]
+}
+
+### Set absolute stock
+PATCH {{baseUrl}}/products/REPLACE_WITH_PRODUCT_ID/stock
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "stockQuantity": 42 }
+
+### Create a coupon
+POST {{baseUrl}}/coupons
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "code": "MANUAL25",
+  "discountType": "PERCENTAGE",
+  "discountValue": 25,
+  "minOrderAmount": 2000,
+  "maxDiscountAmount": 500,
+  "usageLimit": 100,
+  "startDate": "2026-01-01T00:00:00.000Z",
+  "expiryDate": "2026-12-31T23:59:59.000Z",
+  "isActive": true
+}
+
+### Toggle a coupon
+PATCH {{baseUrl}}/coupons/REPLACE_WITH_COUPON_ID/toggle
+Authorization: Bearer {{adminToken}}
+
+### Update delivery pricing
+PATCH {{baseUrl}}/delivery-settings
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "insideDhaka": 70, "outsideDhaka": 130, "freeDeliveryThreshold": 3000 }
+
+### Analytics
+GET {{baseUrl}}/analytics
+Authorization: Bearer {{adminToken}}

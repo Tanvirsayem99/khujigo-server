@@ -1,0 +1,329 @@
+// KhujiGo backend schema.
+// Money is stored as Int (whole Bangladeshi Taka) — the storefront has no paisa.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  /// Optional direct/session connection used by `prisma migrate` and
+  /// `prisma db seed`. Required when `url` points at a connection pooler
+  /// (e.g. Supabase's transaction pooler on port 6543), which cannot run DDL.
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  STAFF
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  OUT_OF_STOCK
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMethod {
+  COD
+  BKASH
+  NAGAD
+  ONLINE
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum ReviewStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum TokenSubject {
+  CUSTOMER
+  ADMIN
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  phone        String   @unique
+  passwordHash String
+  division     String?
+  district     String?
+  area         String?
+  address      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders  Order[]
+  reviews Review[]
+
+  @@map("customers")
+}
+
+model Admin {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  phone        String?
+  passwordHash String
+  role         AdminRole @default(STAFF)
+  avatarUrl    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("admins")
+}
+
+// Hashed refresh tokens, so a stolen token cannot be replayed and logout can revoke.
+model RefreshToken {
+  id        String       @id @default(cuid())
+  tokenHash String       @unique
+  subject   TokenSubject
+  subjectId String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime     @default(now())
+
+  @@index([subject, subjectId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+model Category {
+  id            String   @id @default(cuid())
+  nameEn        String
+  nameBn        String
+  slug          String   @unique
+  descriptionEn String?
+  descriptionBn String?
+  imageUrl      String
+  icon          String?
+  displayOrder  Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  products Product[]
+
+  @@index([displayOrder])
+  @@map("categories")
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  nameEn            String
+  nameBn            String
+  slug              String        @unique
+  sku               String        @unique
+  categoryId        String
+  brand             String
+  shortDescEn       String
+  shortDescBn       String
+  descriptionEn     String
+  descriptionBn     String
+  price             Int
+  comparePrice      Int?
+  discountPercent   Int?
+  stockQuantity     Int           @default(0)
+  lowStockThreshold Int           @default(5)
+  thumbnailUrl      String
+  galleryUrls       String[]      @default([])
+  status            ProductStatus @default(ACTIVE)
+  isFeatured        Boolean       @default(false)
+  isTrending        Boolean       @default(false)
+  isBestSeller      Boolean       @default(false)
+  isNewArrival      Boolean       @default(false)
+  rating            Float         @default(0)
+  reviewsCount      Int           @default(0)
+  // Array of { key_en, key_bn, value_en, value_bn }
+  specifications    Json          @default("[]")
+  tags              String[]      @default([])
+  seoTitle          String?
+  seoDescription    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  category   Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([isTrending])
+  @@index([isBestSeller])
+  @@index([isNewArrival])
+  @@index([price])
+  @@map("products")
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  // Human-facing id, e.g. "KG-2026-8941" — assigned by the API, not a cuid.
+  id             String        @id
+  customerId     String?
+  customerName   String
+  customerPhone  String
+  customerEmail  String?
+  division       String
+  district       String
+  area           String
+  fullAddress    String
+  deliveryNotes  String?
+  subtotal       Int
+  deliveryCharge Int
+  discount       Int           @default(0)
+  couponCode     String?
+  totalAmount    Int
+  paymentMethod  PaymentMethod
+  /// bKash/Nagad transaction id supplied by the customer, reviewed manually.
+  paymentReference String?
+  paymentStatus  PaymentStatus @default(UNPAID)
+  orderStatus    OrderStatus   @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  customer Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  items    OrderItem[]
+
+  @@index([customerId])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+// Denormalized line items — product name/price are snapshotted at order time,
+// so editing a product later never rewrites an existing order.
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String?
+  nameEn       String
+  nameBn       String
+  thumbnailUrl String
+  price        Int
+  quantity     Int
+  total        Int
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Coupon {
+  id                String       @id @default(cuid())
+  code              String       @unique
+  discountType      DiscountType
+  discountValue     Int
+  minOrderAmount    Int          @default(0)
+  maxDiscountAmount Int?
+  usageLimit        Int          @default(0)
+  usedCount         Int          @default(0)
+  startDate         DateTime
+  expiryDate        DateTime
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@map("coupons")
+}
+
+model Review {
+  id           String       @id @default(cuid())
+  productId    String
+  customerId   String?
+  productName  String
+  customerName String
+  rating       Int
+  comment      String
+  status       ReviewStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([status])
+  @@map("reviews")
+}
+
+// ---------------------------------------------------------------------------
+// Storefront content & settings
+// ---------------------------------------------------------------------------
+
+model Banner {
+  id           String   @id @default(cuid())
+  titleEn      String
+  titleBn      String
+  subtitleEn   String
+  subtitleBn   String
+  buttonTextEn String
+  buttonTextBn String
+  buttonUrl    String
+  imageUrl     String
+  badgeEn      String?
+  badgeBn      String?
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([displayOrder])
+  @@map("banners")
+}
+
+// Singleton row (id = "default") holding nationwide delivery pricing.
+model DeliverySettings {
+  id                        String   @id @default("default")
+  insideDhaka               Int      @default(60)
+  outsideDhaka              Int      @default(120)
+  freeDeliveryThreshold     Int      @default(2500)
+  estimatedDaysInsideDhaka  String
+  estimatedDaysOutsideDhaka String
+  updatedAt                 DateTime @updatedAt
+
+  @@map("delivery_settings")
+}
