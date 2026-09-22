@@ -735,7 +735,12 @@ describe('KhujiGo API (e2e)', () => {
   });
 
   describe('admin users (role management)', () => {
-    type AdminRow = { id: string; email: string; role: string; passwordHash?: string };
+    type AdminRow = {
+      id: string;
+      email: string;
+      role: string;
+      passwordHash?: string;
+    };
 
     const listAdmins = async (): Promise<AdminRow[]> => {
       const res = await api()

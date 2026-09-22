@@ -8,11 +8,7 @@ import { CreateCouponDto } from './dto/coupon.dto';
  * of string-matching the English `message`.
  */
 export type CouponRejectionReason =
-  | 'INVALID'
-  | 'NOT_STARTED'
-  | 'EXPIRED'
-  | 'USAGE_LIMIT'
-  | 'MIN_ORDER';
+  'INVALID' | 'NOT_STARTED' | 'EXPIRED' | 'USAGE_LIMIT' | 'MIN_ORDER';
 
 export interface CouponValidationResult {
   valid: boolean;

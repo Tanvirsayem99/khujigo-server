@@ -43,7 +43,10 @@ export class AdminsService {
       throw new NotFoundException(`Admin "${targetAdminId}" was not found`);
     }
 
-    if (target.role === AdminRole.SUPER_ADMIN && role !== AdminRole.SUPER_ADMIN) {
+    if (
+      target.role === AdminRole.SUPER_ADMIN &&
+      role !== AdminRole.SUPER_ADMIN
+    ) {
       const superAdmins = await this.prisma.admin.count({
         where: { role: AdminRole.SUPER_ADMIN },
       });

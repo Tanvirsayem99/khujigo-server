@@ -20,6 +20,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { AuthUser } from '../../common/interfaces/auth-user.interface';
 import { CreateOrderDto, QueryOrdersDto } from './dto/order.dto';
 import {
+  UpdateDeliveryChargeDto,
   UpdateOrderStatusDto,
   UpdatePaymentStatusDto,
 } from './dto/update-order.dto';
@@ -82,6 +83,20 @@ export class OrdersController {
     @Body() dto: UpdatePaymentStatusDto,
   ) {
     return this.ordersService.updatePaymentStatus(id, dto.paymentStatus);
+  }
+
+  @AdminAuth()
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN, AdminRole.STAFF)
+  @ApiBearerAuth()
+  @Patch(':id/delivery-charge')
+  @ApiOperation({
+    summary: 'Confirm whether a COD delivery-charge advance was received',
+  })
+  updateDeliveryCharge(
+    @Param('id') id: string,
+    @Body() dto: UpdateDeliveryChargeDto,
+  ) {
+    return this.ordersService.updateDeliveryChargePaid(id, dto.paid);
   }
 
   @AdminAuth()

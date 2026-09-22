@@ -216,8 +216,11 @@ model Order {
   totalAmount    Int
   paymentMethod  PaymentMethod
   /// bKash/Nagad transaction id supplied by the customer, reviewed manually.
+  /// For COD orders this is the transaction id of the delivery-charge advance.
   paymentReference String?
   paymentStatus  PaymentStatus @default(UNPAID)
+  /// Set by staff once the COD delivery-charge advance has been received.
+  deliveryChargePaid Boolean   @default(false)
   orderStatus    OrderStatus   @default(PENDING)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

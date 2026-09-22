@@ -242,6 +242,19 @@ export class OrdersService {
     });
   }
 
+  /** Staff confirmation that a COD order's delivery-charge advance arrived. */
+  async updateDeliveryChargePaid(
+    id: string,
+    paid: boolean,
+  ): Promise<OrderWithItems> {
+    await this.assertExists(id);
+    return this.prisma.order.update({
+      where: { id },
+      data: { deliveryChargePaid: paid },
+      include: ORDER_INCLUDE,
+    });
+  }
+
   /**
    * Hard-deletes a cancelled order and its line items. Only cancelled orders
    * may be removed so live fulfilment records cannot be destroyed by mistake.

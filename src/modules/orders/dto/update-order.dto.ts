@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum } from 'class-validator';
+import { IsBoolean, IsEnum } from 'class-validator';
 import { OrderStatus, PaymentStatus } from '@prisma/client';
 
 export class UpdateOrderStatusDto {
@@ -12,4 +12,12 @@ export class UpdatePaymentStatusDto {
   @ApiProperty({ enum: PaymentStatus })
   @IsEnum(PaymentStatus)
   paymentStatus!: PaymentStatus;
+}
+
+export class UpdateDeliveryChargeDto {
+  @ApiProperty({
+    description: 'Whether the COD delivery-charge advance was received',
+  })
+  @IsBoolean()
+  paid!: boolean;
 }
