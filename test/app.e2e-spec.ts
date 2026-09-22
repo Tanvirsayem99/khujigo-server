@@ -556,6 +556,54 @@ describe('KhujiGo API (e2e)', () => {
     it('blocks anonymous callers from the admin order list', async () => {
       await api().get('/api/v1/orders').expect(401);
     });
+
+    it('only lets admins delete cancelled orders, removing them from the database', async () => {
+      const created = await api()
+        .post('/api/v1/orders')
+        .send({ ...shipping, items: [{ productId: 'prod-3', quantity: 1 }] })
+        .expect(201);
+
+      // A live order cannot be deleted.
+      await api()
+        .delete(`/api/v1/orders/${created.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
+
+      // Cancel it first.
+      await api()
+        .patch(`/api/v1/orders/${created.body.id}/status`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ status: 'CANCELLED' })
+        .expect(200);
+
+      // Staff cannot delete even a cancelled order.
+      const staffLogin = await api()
+        .post('/api/v1/auth/admin/login')
+        .send({ email: 'staff@khujigo.com', password: 'staff123' })
+        .expect(200);
+      await api()
+        .delete(`/api/v1/orders/${created.body.id}`)
+        .set('Authorization', `Bearer ${staffLogin.body.accessToken}`)
+        .expect(403);
+
+      // Anonymous callers are rejected outright.
+      await api().delete(`/api/v1/orders/${created.body.id}`).expect(401);
+
+      // A full admin deletes it for good.
+      await api()
+        .delete(`/api/v1/orders/${created.body.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      // The receipt is gone and the row (and its items) are gone from the DB.
+      await api().get(`/api/v1/orders/${created.body.id}`).expect(404);
+      expect(
+        await prisma.order.findUnique({ where: { id: created.body.id } }),
+      ).toBeNull();
+      expect(
+        await prisma.orderItem.count({ where: { orderId: created.body.id } }),
+      ).toBe(0);
+    });
   });
 
   describe('reviews', () => {

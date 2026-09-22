@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -81,5 +82,14 @@ export class OrdersController {
     @Body() dto: UpdatePaymentStatusDto,
   ) {
     return this.ordersService.updatePaymentStatus(id, dto.paymentStatus);
+  }
+
+  @AdminAuth()
+  @Roles(AdminRole.SUPER_ADMIN, AdminRole.ADMIN)
+  @ApiBearerAuth()
+  @Delete(':id')
+  @ApiOperation({ summary: 'Permanently delete a cancelled order' })
+  remove(@Param('id') id: string) {
+    return this.ordersService.remove(id);
   }
 }

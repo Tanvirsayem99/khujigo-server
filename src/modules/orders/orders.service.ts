@@ -242,6 +242,26 @@ export class OrdersService {
     });
   }
 
+  /**
+   * Hard-deletes a cancelled order and its line items. Only cancelled orders
+   * may be removed so live fulfilment records cannot be destroyed by mistake.
+   */
+  async remove(id: string): Promise<{ id: string }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      select: { orderStatus: true },
+    });
+    if (!order) {
+      throw new NotFoundException(`Order "${id}" was not found`);
+    }
+    if (order.orderStatus !== OrderStatus.CANCELLED) {
+      throw new BadRequestException('Only cancelled orders can be deleted');
+    }
+
+    await this.prisma.order.delete({ where: { id } });
+    return { id };
+  }
+
   // ------------------------------------------------------------------ helpers
 
   /** Collapses duplicate product ids and prices the lines from the database. */

@@ -969,6 +969,7 @@ async function seed(): Promise<void> {
   await prisma.review.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
+  await prisma.promoSection.deleteMany();
   await prisma.coupon.deleteMany();
   await prisma.banner.deleteMany();
   await prisma.deliverySettings.deleteMany();
@@ -1008,6 +1009,14 @@ async function seed(): Promise<void> {
       freeDeliveryThreshold: 2500,
       estimatedDaysInsideDhaka: '১-২ দিন (ঢাকা)',
       estimatedDaysOutsideDhaka: '২-৪ দিন (সারাদেশ)',
+    },
+  });
+
+  await prisma.promoSection.create({
+    data: {
+      id: 'default',
+      isActive: true,
+      couponId: 'coup-1',
     },
   });
 

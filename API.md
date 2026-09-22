@@ -218,9 +218,14 @@ admin endpoints count every product. Deleting a category that still has products
 | GET | `/orders/:id` | Public (receipt) |
 | PATCH | `/orders/:id/status` | Admin (SUPER_ADMIN, ADMIN, STAFF) |
 | PATCH | `/orders/:id/payment-status` | Admin (SUPER_ADMIN, ADMIN, STAFF) |
+| DELETE | `/orders/:id` | Admin (SUPER_ADMIN, ADMIN) — cancelled orders only |
 
 `GET /orders` filters: `status`, `paymentStatus`, `search` (matches order id, customer name, phone
 or email), `page`, `limit`.
+
+`DELETE /orders/:id` permanently removes a cancelled order and its line items from the database.
+It returns `400` unless the order's status is `CANCELLED`, and `404` if the order does not exist.
+Live orders must be cancelled (via `PATCH /orders/:id/status`) before they can be deleted.
 
 `POST /orders` — checkout. **No amount is accepted from the client.**
 
@@ -387,6 +392,7 @@ Singleton row, auto-created with defaults on first read:
 | `getOrderById` | `GET /orders/:id` |
 | `createOrder` | `POST /orders` |
 | `updateOrderStatus` / `updateOrderPaymentStatus` | `PATCH /orders/:id/status` · `/payment-status` |
+| `deleteOrder` | `DELETE /orders/:id` (cancelled orders only) |
 | `getCoupons` / `createCoupon` / `deleteCoupon` / `toggleCouponStatus` | `GET` / `POST` / `DELETE /coupons/:id` / `PATCH /coupons/:id/toggle` |
 | `validateCoupon` | `POST /coupons/validate` |
 | `getReviews` / `addReview` / `updateReviewStatus` / `deleteReview` | `GET /reviews` / `POST /reviews` / `PATCH /reviews/:id/status` / `DELETE /reviews/:id` |

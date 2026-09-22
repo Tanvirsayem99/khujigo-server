@@ -10,6 +10,7 @@ import { DeliverySettingsModule } from './modules/delivery-settings/delivery-set
 import { HealthModule } from './modules/health/health.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { ProductsModule } from './modules/products/products.module';
+import { PromoSectionModule } from './modules/promo-section/promo-section.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import configuration from './config/configuration';
 import { validateEnv } from './config/env.validation';
@@ -39,6 +40,7 @@ import { UsersModule } from './modules/users/users.module';
     ReviewsModule,
     BannersModule,
     DeliverySettingsModule,
+    PromoSectionModule,
     AnalyticsModule,
     HealthModule,
   ],

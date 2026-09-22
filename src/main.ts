@@ -45,8 +45,9 @@ async function bootstrap(): Promise<void> {
 
   app.enableShutdownHooks();
 
-  const port = config.get<number>('port') ?? 4000;
-  await app.listen(port);
+  const port = process.env.PORT || 30222;
+
+await app.listen(port, '0.0.0.0');
 
   logger.log(`KhujiGo API listening on http://localhost:${port}/api/v1`);
   logger.log(`Swagger docs at http://localhost:${port}/docs`);
