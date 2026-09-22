@@ -12,3 +12,4 @@ export default () => ({
     refreshTtl: process.env.JWT_REFRESH_TTL ?? '30d',
   },
 });
+// configuration
